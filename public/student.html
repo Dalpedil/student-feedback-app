@@ -33,7 +33,6 @@
     <h2>Student Weekly Feedback Form</h2>
     <form action="/submit-feedback" method="POST">
       
-      <!-- Top Row: Student Selection -->
       <div class="top-section">
         <div class="form-group">
           <label for="indexNo">Student Index No</label>
@@ -48,7 +47,6 @@
         </div>
       </div>
 
-      <!-- 5-Week Table (No Date Field) -->
       <table>
         <thead>
           <tr>
@@ -58,7 +56,6 @@
           </tr>
         </thead>
         <tbody id="tableBody">
-          <!-- Populated dynamically -->
         </tbody>
       </table>
 
@@ -67,7 +64,6 @@
   </div>
 
   <script>
-    // Complete 42-Student List
     const studentData = {
       "212317G": "Herath H.M.H.S.",
       "212346T": "Prabhasara P.V.D.",
@@ -117,7 +113,6 @@
       "222371A": "Thirimanna N.S."
     };
 
-    // Populate dropdown
     const select = document.getElementById("indexNo");
     for (const [index, name] of Object.entries(studentData)) {
       const opt = document.createElement("option");
@@ -131,7 +126,6 @@
       document.getElementById("studentName").value = studentData[selectedIndex] || "";
     }
 
-    // Build the 5 week rows without date picker
     const modes = ["Email", "Physical", "WhatsApp", "Message"];
     const tbody = document.getElementById("tableBody");
 
