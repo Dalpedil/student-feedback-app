@@ -10,7 +10,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Dedicated student endpoint: https://student-feedback-app-cwlo.onrender.com/student
+// Dedicated student endpoint
 app.get('/student', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'student.html'));
 });
