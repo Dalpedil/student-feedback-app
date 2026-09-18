@@ -10,7 +10,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Dedicated student endpoint
+// Dedicated student route
 app.get('/student', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'student.html'));
 });
@@ -24,7 +24,7 @@ app.post('/submit-feedback', async (req, res) => {
     if (entry) {
       tableRows += `
         <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;">Week ${i} (${entry.date})</td>
+          <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Week ${i}</td>
           <td style="padding: 8px; border: 1px solid #ddd;">${entry.mode}</td>
           <td style="padding: 8px; border: 1px solid #ddd;">${entry.comment}</td>
         </tr>
@@ -40,7 +40,7 @@ app.post('/submit-feedback', async (req, res) => {
     <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
       <thead>
         <tr style="background-color: #f2f2f2;">
-          <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Week (Date)</th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Week</th>
           <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Contacted Mode</th>
           <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Comments</th>
         </tr>
