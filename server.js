@@ -11,12 +11,14 @@ app.enable('trust proxy');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// Setup Express Session
 app.use(session({
   secret: process.env.SESSION_SECRET || 'feedback-secure-session-key-2026',
   resave: false,
   saveUninitialized: false
 }));
 
+// Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -40,6 +42,7 @@ passport.use(new GoogleStrategy({
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// Auth Guard
 function ensureAuthenticated(req, res, next) {
   if (req.isAuthenticated()) {
     return next();
@@ -47,6 +50,7 @@ function ensureAuthenticated(req, res, next) {
   res.redirect('/login');
 }
 
+// Login Page
 app.get('/login', (req, res) => {
   if (req.isAuthenticated()) {
     return res.redirect('/student');
@@ -54,6 +58,7 @@ app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
+// Root route
 app.get('/', (req, res) => {
   if (req.isAuthenticated()) {
     res.redirect('/student');
@@ -62,8 +67,10 @@ app.get('/', (req, res) => {
   }
 });
 
+// Google Auth Trigger Route
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
+// Google Auth Callback Route
 app.get('/auth/google/callback', 
   passport.authenticate('google', { failureRedirect: '/login' }),
   (req, res) => {
@@ -71,6 +78,7 @@ app.get('/auth/google/callback',
   }
 );
 
+// Logout Route
 app.get('/logout', (req, res, next) => {
   req.logout((err) => {
     if (err) return next(err);
@@ -78,12 +86,15 @@ app.get('/logout', (req, res, next) => {
   });
 });
 
+// Protected Student Feedback Page
 app.get('/student', ensureAuthenticated, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'student.html'));
 });
 
+// Static assets
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Feedback Submission Route
 app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
   const { indexNo, studentName, weeks } = req.body;
   const loggedInEmail = req.user?.emails?.[0]?.value || 'Unknown Email';
@@ -122,16 +133,11 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
     </table>
   `;
 
-  // Recipients: Primary recipient + Nipuni's email
-  const recipients = [
-    process.env.RECIPIENT_EMAIL || 'diland@gmail.com',
-    process.env.NIPUNI_EMAIL || 'nipuni@example.com'
-  ];
-
   try {
+    // Exclusively sends to your verified Resend account address
     await resend.emails.send({
       from: 'Feedback Portal <onboarding@resend.dev>',
-      to: recipients,
+      to: ['diland@gmail.com'],
       reply_to: loggedInEmail,
       subject: `Weekly Progress: ${indexNo} - ${studentName}`,
       html: htmlContent
