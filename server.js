@@ -50,7 +50,7 @@ function ensureAuthenticated(req, res, next) {
   res.redirect('/login');
 }
 
-// Login Page
+// Login Landing Page
 app.get('/login', (req, res) => {
   if (req.isAuthenticated()) {
     return res.redirect('/student');
@@ -98,6 +98,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
   const { indexNo, studentName, weeks } = req.body;
   const loggedInEmail = req.user?.emails?.[0]?.value || 'Unknown Email';
+  const loggedInName = req.user?.displayName || 'Unknown User';
 
   let tableRows = '';
   for (let i = 1; i <= 5; i++) {
@@ -116,6 +117,11 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
   const htmlContent = `
     <h2>Students Weekly Progress - Key Discussions</h2>
     <hr style="border: none; border-top: 1px solid #eee; margin-bottom: 15px;" />
+    
+    <div style="background-color: #f1f3f5; padding: 10px 14px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #007bff;">
+      <p style="margin: 0; font-size: 14px;"><strong>Submitted by (Logged-in Account):</strong> ${loggedInEmail} (${loggedInName})</p>
+    </div>
+
     <p><strong>Student Index No:</strong> ${indexNo}</p>
     <p><strong>Student Name:</strong> ${studentName}</p>
     
@@ -134,12 +140,11 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
   `;
 
   try {
-    // Exclusively sends to your verified Resend account address
     await resend.emails.send({
       from: 'Feedback Portal <onboarding@resend.dev>',
       to: ['diland@gmail.com'],
       reply_to: loggedInEmail,
-      subject: `Weekly Progress: ${indexNo} - ${studentName}`,
+      subject: `Weekly Progress: ${indexNo} - ${studentName} (${loggedInEmail})`,
       html: htmlContent
     });
 
