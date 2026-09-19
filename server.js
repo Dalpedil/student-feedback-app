@@ -58,7 +58,7 @@ app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Root route
+// Root Route
 app.get('/', (req, res) => {
   if (req.isAuthenticated()) {
     res.redirect('/student');
@@ -115,7 +115,7 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
   }
 
   const htmlContent = `
-    <h2>Students Weekly Progress - Key Discussions</h2>
+    <h2>Students Weekly Progress - ISRP 2026</h2>
     <hr style="border: none; border-top: 1px solid #eee; margin-bottom: 15px;" />
     
     <div style="background-color: #f1f3f5; padding: 10px 14px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #007bff;">
