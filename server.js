@@ -1,10 +1,106 @@
-// Feedback Submission Route
+require('dotenv').config();
+const express = require('express');
+const session = require('express-session');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const { Resend } = require('resend');
+const path = require('path');
+
+const app = express();
+app.enable('trust proxy');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Setup Express Session
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'feedback-secure-session-key-2026',
+  resave: false,
+  saveUninitialized: false
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((user, done) => done(null, user));
+
+const clientID = process.env.GOOGLE_CLIENT_ID || 'missing';
+const clientSecret = process.env.GOOGLE_CLIENT_SECRET || 'missing';
+
+passport.use(new GoogleStrategy({
+    clientID: clientID,
+    clientSecret: clientSecret,
+    callbackURL: process.env.CALLBACK_URL || "https://student-feedback-app-cwlo.onrender.com/auth/google/callback",
+    proxy: true
+  },
+  (accessToken, refreshToken, profile, done) => {
+    return done(null, profile);
+  }
+));
+
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
+// Authentication Middleware Guard
+function ensureAuthenticated(req, res, next) {
+  if (req.isAuthenticated()) {
+    return next();
+  }
+  res.redirect('/login');
+}
+
+// Login Landing Page
+app.get('/login', (req, res) => {
+  if (req.isAuthenticated()) {
+    return res.redirect('/student');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Root Route Redirection
+app.get('/', (req, res) => {
+  if (req.isAuthenticated()) {
+    res.redirect('/student');
+  } else {
+    res.redirect('/login');
+  }
+});
+
+// Google Authentication Trigger Route
+app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+// Google Authentication Callback Route
+app.get('/auth/google/callback', 
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  (req, res) => {
+    res.redirect('/student');
+  }
+);
+
+// Logout Route
+app.get('/logout', (req, res, next) => {
+  req.logout((err) => {
+    if (err) return next(err);
+    res.redirect('/login');
+  });
+});
+
+// Protected Student Application Route
+app.get('/student', ensureAuthenticated, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'student.html'));
+});
+
+// Static Assets Middleware
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Feedback Submission and Reporting Route
 app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
   const { indexNo, studentName, weeks } = req.body;
   const loggedInEmail = req.user?.emails?.[0]?.value || 'Unknown Email';
   const loggedInName = req.user?.displayName || 'Unknown User';
 
-  // Normalize weeks into a clean array regardless of indexing
+  // Normalize weeks array handling both 0-indexed structures and object representations
   const weekEntries = Array.isArray(weeks) 
     ? weeks.filter(Boolean) 
     : Object.values(weeks || {});
@@ -50,7 +146,7 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
   try {
     await resend.emails.send({
       from: 'Feedback Portal <onboarding@resend.dev>',
-      to: ['diland@gmail.com'],
+      to: [process.env.RECIPIENT_EMAIL || 'diland@gmail.com'],
       reply_to: loggedInEmail,
       subject: `Weekly Progress: ${indexNo} - ${studentName} (${loggedInEmail})`,
       html: htmlContent
@@ -76,3 +172,6 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
     `);
   }
 });
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
