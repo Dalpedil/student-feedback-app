@@ -122,7 +122,7 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
 
     <p><strong>Student Index No:</strong> ${indexNo}</p>
     <p><strong>Student Name:</strong> ${studentName}</p>
-    <p><strong>Meetings Held so far (18th Aug – 22nd Aug):</strong> ${meetingCount}</p>
+    <p><strong>No. of meetings held so far (18th Aug – today):</strong> ${meetingCount}</p>
     
     <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
       <thead>
