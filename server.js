@@ -138,7 +138,6 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
       });
 
       // Append rows to 'Details' sheet
-      // Columns: Timestamp, Submitted By, Student Index No, Student Name, Meeting No, Date, Start Time, End Time, Duration, Contacted Mode
       if (meetingEntries.length > 0 && meetingCount !== '0') {
         const detailRows = meetingEntries.map((entry, idx) => [
           timestamp,
@@ -160,7 +159,6 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
           requestBody: { values: detailRows }
         });
       } else {
-        // If 0 meetings, record Not Contacted
         await sheets.spreadsheets.values.append({
           spreadsheetId,
           range: 'Details!A:J',
@@ -197,7 +195,7 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
   }
 
   const htmlContent = `
-    <h2>Students Weekly Progress - ISRP 2026</h2>
+    <h2>Students Progress (18 August - 19 September) - ISRP 2026</h2>
     <hr style="border: none; border-top: 1px solid #eee; margin-bottom: 15px;" />
     
     <div style="background-color: #f1f3f5; padding: 10px 14px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #007bff;">
@@ -206,7 +204,7 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
 
     <p><strong>Student Index No:</strong> ${indexNo}</p>
     <p><strong>Student Name:</strong> ${studentName}</p>
-    <p><strong>No. of meetings held so far (18th Aug – today):</strong> ${meetingCount}</p>
+    <p><strong>Number of meetings (18 August - 19 September):</strong> ${meetingCount}</p>
     
     <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
       <thead>
@@ -231,7 +229,7 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
       from: 'Feedback Portal <onboarding@resend.dev>',
       to: ['diland@gmail.com'],
       reply_to: loggedInEmail,
-      subject: `Weekly Progress: ${indexNo} - ${studentName} (${loggedInEmail})`,
+      subject: `Progress Report: ${indexNo} - ${studentName} (${loggedInEmail})`,
       html: htmlContent
     });
 
