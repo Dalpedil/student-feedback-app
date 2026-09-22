@@ -47,14 +47,16 @@ app.use(express.json());
 function getSheetsClient() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   let privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
-  privateKey = privateKey.replace(/\\n/g, '\n');
+  privateKey = privateKey.replace(/^"|"$/g, '').replace(/\\n/g, '\n');
 
-  const auth = new google.auth.JWT(
-    email,
-    null,
-    privateKey,
-    ['https://www.googleapis.com/auth/spreadsheets']
-  );
+  const auth = new google.auth.JWT({
+    email: email,
+    key: privateKey,
+    scopes: [
+      'https://www.googleapis.com/auth/spreadsheets',
+      'https://www.googleapis.com/auth/drive'
+    ]
+  });
 
   return google.sheets({ version: 'v4', auth });
 }
@@ -136,6 +138,7 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
       });
 
       // Append rows to 'Details' sheet
+      // Columns: Timestamp, Submitted By, Student Index No, Student Name, Meeting No, Date, Start Time, End Time, Duration, Contacted Mode
       if (meetingEntries.length > 0 && meetingCount !== '0') {
         const detailRows = meetingEntries.map((entry, idx) => [
           timestamp,
@@ -144,25 +147,26 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
           studentName,
           idx + 1,
           entry.date || '-',
-          entry.time || '-',
+          entry.startTime || '-',
+          entry.endTime || '-',
           entry.duration || '-',
           entry.mode || '-'
         ]);
 
         await sheets.spreadsheets.values.append({
           spreadsheetId,
-          range: 'Details!A:I',
+          range: 'Details!A:J',
           valueInputOption: 'USER_ENTERED',
           requestBody: { values: detailRows }
         });
       } else {
-        // If 0 meetings, log as Not Contacted
+        // If 0 meetings, record Not Contacted
         await sheets.spreadsheets.values.append({
           spreadsheetId,
-          range: 'Details!A:I',
+          range: 'Details!A:J',
           valueInputOption: 'USER_ENTERED',
           requestBody: {
-            values: [[timestamp, loggedInEmail, indexNo, studentName, '0', '-', '-', '-', 'Not Contacted']]
+            values: [[timestamp, loggedInEmail, indexNo, studentName, '0', '-', '-', '-', '-', 'Not Contacted']]
           }
         });
       }
@@ -174,7 +178,7 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
   // 2. Generate HTML Table for Email
   let tableRows = '';
   if (meetingEntries.length === 0 || meetingCount === '0') {
-    tableRows = `<tr><td colspan="5" style="text-align: center; padding: 12px; color: #777;">Not Contacted during this period.</td></tr>`;
+    tableRows = `<tr><td colspan="6" style="text-align: center; padding: 12px; color: #777;">Not Contacted during this period.</td></tr>`;
   } else {
     meetingEntries.forEach((entry, idx) => {
       if (entry) {
@@ -182,7 +186,8 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
           <tr>
             <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;">${idx + 1}</td>
             <td style="padding: 8px; border: 1px solid #ddd;">${entry.date || '-'}</td>
-            <td style="padding: 8px; border: 1px solid #ddd;">${entry.time || '-'}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${entry.startTime || '-'}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${entry.endTime || '-'}</td>
             <td style="padding: 8px; border: 1px solid #ddd;">${entry.duration || '-'}</td>
             <td style="padding: 8px; border: 1px solid #ddd;">${entry.mode || '-'}</td>
           </tr>
@@ -206,11 +211,12 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
     <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
       <thead>
         <tr style="background-color: #f2f2f2;">
-          <th style="padding: 8px; border: 1px solid #ddd; text-align: center; width: 8%;">No</th>
-          <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 25%;">Date</th>
-          <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 20%;">Time</th>
-          <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 22%;">Duration</th>
-          <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 25%;">Contacted Mode</th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: center; width: 6%;">No</th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 20%;">Date</th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 17%;">Start Time</th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 17%;">End Time</th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 18%;">Duration</th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 22%;">Contacted Mode</th>
         </tr>
       </thead>
       <tbody>
