@@ -11,14 +11,12 @@ app.enable('trust proxy');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Setup Express Session
 app.use(session({
   secret: process.env.SESSION_SECRET || 'feedback-secure-session-key-2026',
   resave: false,
   saveUninitialized: false
 }));
 
-// Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -42,7 +40,6 @@ passport.use(new GoogleStrategy({
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// Authentication Middleware Guard
 function ensureAuthenticated(req, res, next) {
   if (req.isAuthenticated()) {
     return next();
@@ -50,7 +47,6 @@ function ensureAuthenticated(req, res, next) {
   res.redirect('/login');
 }
 
-// Login Landing Page
 app.get('/login', (req, res) => {
   if (req.isAuthenticated()) {
     return res.redirect('/student');
@@ -58,7 +54,6 @@ app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Root Route Redirection
 app.get('/', (req, res) => {
   if (req.isAuthenticated()) {
     res.redirect('/student');
@@ -67,10 +62,8 @@ app.get('/', (req, res) => {
   }
 });
 
-// Google Authentication Trigger Route
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-// Google Authentication Callback Route
 app.get('/auth/google/callback', 
   passport.authenticate('google', { failureRedirect: '/login' }),
   (req, res) => {
@@ -78,7 +71,6 @@ app.get('/auth/google/callback',
   }
 );
 
-// Logout Route
 app.get('/logout', (req, res, next) => {
   req.logout((err) => {
     if (err) return next(err);
@@ -86,37 +78,39 @@ app.get('/logout', (req, res, next) => {
   });
 });
 
-// Protected Student Application Route
 app.get('/student', ensureAuthenticated, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'student.html'));
 });
 
-// Static Assets Middleware
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Feedback Submission and Reporting Route
 app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
-  const { indexNo, studentName, weeks } = req.body;
+  const { indexNo, studentName, meetingCount, meetings } = req.body;
   const loggedInEmail = req.user?.emails?.[0]?.value || 'Unknown Email';
   const loggedInName = req.user?.displayName || 'Unknown User';
 
-  // Normalize weeks array handling both 0-indexed structures and object representations
-  const weekEntries = Array.isArray(weeks) 
-    ? weeks.filter(Boolean) 
-    : Object.values(weeks || {});
+  const meetingEntries = Array.isArray(meetings)
+    ? meetings.filter(Boolean)
+    : Object.values(meetings || {});
 
   let tableRows = '';
-  weekEntries.forEach((entry, idx) => {
-    if (entry) {
-      tableRows += `
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">${entry.label || 'Week ' + (idx + 1)}</td>
-          <td style="padding: 8px; border: 1px solid #ddd;">${entry.mode || ''}</td>
-          <td style="padding: 8px; border: 1px solid #ddd;">${entry.comment || ''}</td>
-        </tr>
-      `;
-    }
-  });
+  if (meetingEntries.length === 0 || meetingCount === '0') {
+    tableRows = `<tr><td colspan="5" style="text-align: center; padding: 12px; color: #777;">Not Contacted during this period.</td></tr>`;
+  } else {
+    meetingEntries.forEach((entry, idx) => {
+      if (entry) {
+        tableRows += `
+          <tr>
+            <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;">${idx + 1}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${entry.date || '-'}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${entry.time || '-'}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${entry.duration || '-'}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${entry.mode || '-'}</td>
+          </tr>
+        `;
+      }
+    });
+  }
 
   const htmlContent = `
     <h2>Students Weekly Progress - ISRP 2026</h2>
@@ -128,13 +122,16 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
 
     <p><strong>Student Index No:</strong> ${indexNo}</p>
     <p><strong>Student Name:</strong> ${studentName}</p>
+    <p><strong>Meetings Held so far (18th Aug – 22nd Aug):</strong> ${meetingCount}</p>
     
     <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
       <thead>
         <tr style="background-color: #f2f2f2;">
-          <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Week</th>
-          <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Contacted Mode</th>
-          <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Key Discussions</th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: center; width: 8%;">No</th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 25%;">Date</th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 20%;">Time</th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 22%;">Duration</th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 25%;">Contacted Mode</th>
         </tr>
       </thead>
       <tbody>
@@ -146,7 +143,7 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
   try {
     await resend.emails.send({
       from: 'Feedback Portal <onboarding@resend.dev>',
-      to: [process.env.RECIPIENT_EMAIL || 'diland@gmail.com'],
+      to: ['diland@gmail.com'],
       reply_to: loggedInEmail,
       subject: `Weekly Progress: ${indexNo} - ${studentName} (${loggedInEmail})`,
       html: htmlContent
