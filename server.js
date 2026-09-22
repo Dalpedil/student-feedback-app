@@ -4,6 +4,7 @@ const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const { Resend } = require('resend');
+const { google } = require('googleapis');
 const path = require('path');
 
 const app = express();
@@ -42,7 +43,23 @@ passport.use(new GoogleStrategy({
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// Auth Guard
+// Setup Google Sheets Client via Service Account
+function getSheetsClient() {
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  let privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
+  privateKey = privateKey.replace(/\\n/g, '\n');
+
+  const auth = new google.auth.JWT(
+    email,
+    null,
+    privateKey,
+    ['https://www.googleapis.com/auth/spreadsheets']
+  );
+
+  return google.sheets({ version: 'v4', auth });
+}
+
+// Authentication Guard
 function ensureAuthenticated(req, res, next) {
   if (req.isAuthenticated()) {
     return next();
@@ -58,7 +75,7 @@ app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Root route
+// Root Route
 app.get('/', (req, res) => {
   if (req.isAuthenticated()) {
     res.redirect('/student');
@@ -67,10 +84,9 @@ app.get('/', (req, res) => {
   }
 });
 
-// Google Auth Trigger Route
+// Auth Routes
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-// Google Auth Callback Route
 app.get('/auth/google/callback', 
   passport.authenticate('google', { failureRedirect: '/login' }),
   (req, res) => {
@@ -78,7 +94,6 @@ app.get('/auth/google/callback',
   }
 );
 
-// Logout Route
 app.get('/logout', (req, res, next) => {
   req.logout((err) => {
     if (err) return next(err);
@@ -86,12 +101,12 @@ app.get('/logout', (req, res, next) => {
   });
 });
 
-// Protected Student Feedback Page
+// Protected Student Page
 app.get('/student', ensureAuthenticated, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'student.html'));
 });
 
-// Static assets
+// Static Assets
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Feedback Submission Route
@@ -99,11 +114,64 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
   const { indexNo, studentName, meetingCount, meetings } = req.body;
   const loggedInEmail = req.user?.emails?.[0]?.value || 'Unknown Email';
   const loggedInName = req.user?.displayName || 'Unknown User';
+  const timestamp = new Date().toLocaleString('en-US', { timeZone: 'Asia/Colombo' });
 
   const meetingEntries = Array.isArray(meetings)
     ? meetings.filter(Boolean)
     : Object.values(meetings || {});
 
+  // 1. Append rows to Google Sheets (Summary & Details)
+  if (process.env.GOOGLE_SHEET_ID && process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL) {
+    try {
+      const sheets = getSheetsClient();
+      const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
+      // Append row to 'Summary' sheet
+      const summaryRow = [timestamp, loggedInEmail, indexNo, studentName, meetingCount];
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: 'Summary!A:E',
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [summaryRow] }
+      });
+
+      // Append rows to 'Details' sheet
+      if (meetingEntries.length > 0 && meetingCount !== '0') {
+        const detailRows = meetingEntries.map((entry, idx) => [
+          timestamp,
+          loggedInEmail,
+          indexNo,
+          studentName,
+          idx + 1,
+          entry.date || '-',
+          entry.time || '-',
+          entry.duration || '-',
+          entry.mode || '-'
+        ]);
+
+        await sheets.spreadsheets.values.append({
+          spreadsheetId,
+          range: 'Details!A:I',
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: detailRows }
+        });
+      } else {
+        // If 0 meetings, log as Not Contacted
+        await sheets.spreadsheets.values.append({
+          spreadsheetId,
+          range: 'Details!A:I',
+          valueInputOption: 'USER_ENTERED',
+          requestBody: {
+            values: [[timestamp, loggedInEmail, indexNo, studentName, '0', '-', '-', '-', 'Not Contacted']]
+          }
+        });
+      }
+    } catch (sheetError) {
+      console.error('Error appending to Google Sheet:', sheetError);
+    }
+  }
+
+  // 2. Generate HTML Table for Email
   let tableRows = '';
   if (meetingEntries.length === 0 || meetingCount === '0') {
     tableRows = `<tr><td colspan="5" style="text-align: center; padding: 12px; color: #777;">Not Contacted during this period.</td></tr>`;
@@ -151,6 +219,7 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
     </table>
   `;
 
+  // 3. Dispatch Email via Resend
   try {
     await resend.emails.send({
       from: 'Feedback Portal <onboarding@resend.dev>',
@@ -163,7 +232,7 @@ app.post('/submit-feedback', ensureAuthenticated, async (req, res) => {
     res.status(200).send(`
       <div style="text-align: center; margin-top: 50px; font-family: sans-serif;">
         <h2 style="color: green;">Submission Successful!</h2>
-        <p>Progress report for <strong>${studentName} (${indexNo})</strong> has been recorded and emailed.</p>
+        <p>Progress report for <strong>${studentName} (${indexNo})</strong> has been saved to Google Sheets and emailed.</p>
         <p style="margin-top: 20px;">
           <a href="/student" style="color: #007bff; text-decoration: none; font-weight: bold;">Submit Another</a> | 
           <a href="/logout" style="color: #dc3545; text-decoration: none;">Logout</a>
