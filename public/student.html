@@ -6,7 +6,7 @@
   <title>Students Weekly Progress - ISRP 2026</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 25px; background: #f7f9fa; }
-    .container { max-width: 900px; margin: auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .container { max-width: 950px; margin: auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
     h2 { text-align: center; margin-bottom: 20px; color: #333; }
     
     .top-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
@@ -68,11 +68,12 @@
       <table>
         <thead>
           <tr>
-            <th style="width: 8%;">No</th>
-            <th style="width: 25%;">Date</th>
-            <th style="width: 20%;">Time</th>
-            <th style="width: 22%;">Duration</th>
-            <th style="width: 25%;">Contacted Mode</th>
+            <th style="width: 5%;">No</th>
+            <th style="width: 20%;">Date</th>
+            <th style="width: 17%;">Start Time</th>
+            <th style="width: 17%;">End Time</th>
+            <th style="width: 18%;">Duration</th>
+            <th style="width: 23%;">Contacted Mode</th>
           </tr>
         </thead>
         <tbody id="tableBody">
@@ -97,7 +98,7 @@
       "222311R": "Perera G.G.N.",
       "222315H": "Ishara W.M.A.D.",
       "222317P": "Jathuppiriyan J.",
-      "222320T": "Jayawansha I.C.L.",
+      "222320T": "Jayawansha I.CL.",
       "222322C": "Kalpanee B.G.W.",
       "222323F": "Krishnakumar R.",
       "222326R": "Malsha B.H.",
@@ -146,7 +147,38 @@
       document.getElementById("studentName").value = studentData[selectedIndex] || "";
     }
 
-    const modes = ["In-Person", "Online", "Telephone", "Not Contacted"];
+    // Removed "Not Contacted" from modes
+    const modes = ["In-Person", "Online", "Telephone"];
+
+    function calculateDuration(rowIdx) {
+      const startTimeVal = document.getElementById(`start_${rowIdx}`).value;
+      const endTimeVal = document.getElementById(`end_${rowIdx}`).value;
+      const durationInput = document.getElementById(`duration_${rowIdx}`);
+
+      if (!startTimeVal || !endTimeVal) {
+        durationInput.value = "";
+        return;
+      }
+
+      const [startH, startM] = startTimeVal.split(":").map(Number);
+      const [endH, endM] = endTimeVal.split(":").map(Number);
+
+      let diffMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+
+      if (diffMinutes < 0) {
+        diffMinutes += 24 * 60; // Rolled over midnight
+      }
+
+      const hrs = Math.floor(diffMinutes / 60);
+      const mins = diffMinutes % 60;
+
+      let result = [];
+      if (hrs > 0) result.push(`${hrs} hr${hrs > 1 ? 's' : ''}`);
+      if (mins > 0) result.push(`${mins} min${mins > 1 ? 's' : ''}`);
+      if (result.length === 0) result.push('0 mins');
+
+      durationInput.value = result.join(' ');
+    }
 
     function renderMeetingRows() {
       const count = parseInt(document.getElementById("meetingCount").value, 10);
@@ -154,7 +186,7 @@
       tbody.innerHTML = "";
 
       if (count === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #777; padding: 15px;">Not Contacted during this period.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #777; padding: 15px;">Not Contacted during this period.</td></tr>`;
         return;
       }
 
@@ -163,8 +195,9 @@
         tr.innerHTML = `
           <td style="font-weight: bold; text-align: center;">${i}</td>
           <td><input type="date" name="meetings[${i}][date]" required></td>
-          <td><input type="time" name="meetings[${i}][time]" required></td>
-          <td><input type="text" name="meetings[${i}][duration]" placeholder="e.g. 30 mins" required></td>
+          <td><input type="time" id="start_${i}" name="meetings[${i}][startTime]" onchange="calculateDuration(${i})" required></td>
+          <td><input type="time" id="end_${i}" name="meetings[${i}][endTime]" onchange="calculateDuration(${i})" required></td>
+          <td><input type="text" id="duration_${i}" name="meetings[${i}][duration]" placeholder="Auto-calculated" readonly required></td>
           <td>
             <select name="meetings[${i}][mode]" required>
               <option value="" disabled selected>Select Mode</option>
