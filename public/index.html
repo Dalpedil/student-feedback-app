@@ -98,7 +98,7 @@
       "222311R": "Perera G.G.N.",
       "222315H": "Ishara W.M.A.D.",
       "222317P": "Jathuppiriyan J.",
-      "222320T": "Jayawansha I.CL.",
+      "222320T": "Jayawansha I.C.L.",
       "222322C": "Kalpanee B.G.W.",
       "222323F": "Krishnakumar R.",
       "222326R": "Malsha B.H.",
@@ -147,8 +147,8 @@
       document.getElementById("studentName").value = studentData[selectedIndex] || "";
     }
 
-    // Removed "Not Contacted" from modes
-    const modes = ["In-Person", "Online", "Telephone"];
+    // Only In-Person and Online
+    const modes = ["In-Person", "Online"];
 
     function calculateDuration(rowIdx) {
       const startTimeVal = document.getElementById(`start_${rowIdx}`).value;
